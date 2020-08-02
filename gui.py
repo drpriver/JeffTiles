@@ -383,7 +383,7 @@ class App:
     def display_grid(self, *args, **kwargs) -> None:
         if self.im:
             width = self.canvas.winfo_width() - 20
-            height = self.canvas.winfo_width() - 20
+            height = self.canvas.winfo_height() - 20
             resized = resize_image(self.im, width, height)
             self.photo=ImageTk.PhotoImage(resized)
             self.canvas.create_image(10, 10, image=self.photo, anchor='nw')
