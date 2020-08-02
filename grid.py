@@ -1,5 +1,6 @@
 import enum
 from typing import List, NamedTuple, Optional, Tuple
+from dataclasses import dataclass
 from PIL import Image
 import random
 import glob
@@ -7,12 +8,13 @@ import os
 
 class Grid:
     def __init__(self, width:int, height:int):
-        self.upper:        List['Tile']         = []
-        self.bottom_left:  List['Tile']         = []
-        self.bottom_right: List['Tile']         = []
-        self.middle:       List['Tile']         = []
+        self.upper:        List['Tile'] = []
+        self.bottom_left:  List['Tile'] = []
+        self.bottom_right: List['Tile'] = []
+        self.middle:       List['Tile'] = []
         self.width  = width
         self.height = height
+
     def shuffle(self):
         for l in (self.upper, self.bottom_left, self.bottom_right, self.middle):
             random.shuffle(l)
@@ -23,7 +25,8 @@ class TileLocation(enum.Flag):
     SIDE   = enum.auto()
     UPPER  = enum.auto()
 
-class Tile(NamedTuple):
+@dataclass
+class Tile:
     name: str
     path: str
     repeatable: bool
@@ -33,13 +36,19 @@ class Tile(NamedTuple):
     special: bool
     is_blank: bool
 
-def make_grid(tileset:List[Tile]) -> Grid:
-    LOWER_BLANK_PERCENTAGE = 30
-    UPPER_BLANK_PERCENTAGE = 20
-    SPECIAL_LIMIT = 1
-    MIDDLE_AMOUNT = 3
-    SIDE_AMOUNT = 3
-    UPPER_AMOUNT = SIDE_AMOUNT * 2 + MIDDLE_AMOUNT
+def select(tiles:List[Tile])->Tile:
+    return random.choices(tiles, weights=[t.weight for t in tiles])[0]
+
+
+def make_grid(
+        tileset:List[Tile],
+        lower_blank_percentage:float,
+        upper_blank_percentage:float,
+        special_limit:int,
+        middle_size:int,
+        side_size:int,
+        ) -> Grid:
+    UPPER_AMOUNT = side_size * 2 + middle_size
     WIDTH = UPPER_AMOUNT
     HEIGHT = 2
     grid = Grid(WIDTH, HEIGHT)
@@ -50,11 +59,12 @@ def make_grid(tileset:List[Tile]) -> Grid:
             upper_blanks.append(t)
         else:
             upper_nonblanks.append(t)
+
     for _ in range(UPPER_AMOUNT):
-        if random.random() * 100 < UPPER_BLANK_PERCENTAGE:
-            grid.upper.append(random.choice(upper_blanks))
+        if random.random() * 100 < upper_blank_percentage:
+            grid.upper.append(select(upper_blanks))
         else:
-            grid.upper.append(random.choice(upper_nonblanks))
+            grid.upper.append(select(upper_nonblanks))
 
     side_blanks:List[Tile] = []
     side_nonblanks:List[Tile] = []
@@ -72,37 +82,37 @@ def make_grid(tileset:List[Tile]) -> Grid:
         else:
             middle_nonblanks.append(t)
     # left
-    for _ in range(SIDE_AMOUNT):
-        if random.random() * 100 < LOWER_BLANK_PERCENTAGE:
-            grid.bottom_left.append(random.choice(side_blanks))
+    for _ in range(side_size):
+        if random.random() * 100 < lower_blank_percentage:
+            grid.bottom_left.append(select(side_blanks))
         else:
-            grid.bottom_left.append(random.choice(side_nonblanks))
+            grid.bottom_left.append(select(side_nonblanks))
     # middle
-    for _ in range(MIDDLE_AMOUNT):
-        if random.random() * 100 < LOWER_BLANK_PERCENTAGE:
-            grid.middle.append(random.choice(middle_blanks))
+    for _ in range(middle_size):
+        if random.random() * 100 < lower_blank_percentage:
+            grid.middle.append(select(middle_blanks))
         else:
-            grid.middle.append(random.choice(middle_nonblanks))
+            grid.middle.append(select(middle_nonblanks))
     # right
-    for _ in range(SIDE_AMOUNT):
-        if random.random() * 100 < LOWER_BLANK_PERCENTAGE:
-            grid.bottom_right.append(random.choice(side_blanks))
+    for _ in range(side_size):
+        if random.random() * 100 < lower_blank_percentage:
+            grid.bottom_right.append(select(side_blanks))
         else:
-            grid.bottom_right.append(random.choice(side_nonblanks))
+            grid.bottom_right.append(select(side_nonblanks))
 
     # apply constraint - only 1 special
     special_count = 0
     for t in grid.middle:
         if t.special:
             special_count += 1
-    if special_count > SPECIAL_LIMIT:
+    if special_count > special_limit:
         specials = [t for t in grid.middle if t.special]
         nonspecials = [t for t in grid.middle if not t.special]
         middle_nonspecials = [t for t in middle_nonblanks if not t.special]
         new_middle: List[Tile] = nonspecials
-        new_middle.append(random.choice(specials))
-        while len(new_middle) < MIDDLE_AMOUNT:
-            new_middle.append(random.choice(middle_nonspecials))
+        new_middle.append(select(specials))
+        while len(new_middle) < middle_size:
+            new_middle.append(select(middle_nonspecials))
         grid.middle = new_middle
     grid.shuffle()
     return grid
@@ -113,20 +123,20 @@ class ImageCache:
         self.cache : Dict[str, Image.Image] = {}
 
     def get(self, path:str) -> Image.Image:
-        # note: can throw FileNotFoundError or OSError (IOError?)
+        # TODO: can throw FileNotFoundError or OSError (IOError?)
+        # we don't really handle that anywhere
         if path in self.cache:
             return self.cache[path]
         img = Image.open(path)
         self.cache[path] = img
         return img
 
-def make_grid_image(grid:Grid, imagecache:ImageCache=ImageCache()) -> Image.Image:
+imagecache = ImageCache()
+def make_grid_image(grid:Grid, imagecache:ImageCache=imagecache) -> Image.Image:
     TILEWIDTH  = 250
     TILEHEIGHT = 250
     PIXELWIDTH = grid.width * TILEWIDTH
     PIXELHEIGHT = grid.height * TILEHEIGHT
-    #TODO: is it HWC or WHC?
-
     img = Image.new('RGB', (PIXELWIDTH, PIXELHEIGHT))
     for n, t in enumerate(grid.upper):
         subimg = imagecache.get(t.path)
@@ -161,9 +171,12 @@ def tiles_from_folders(folderpath:str) -> List[Tile]:
     tileset : List[Tile] = []
     for path in paths:
         try:
-            name = path.split('/')[-1].replace('.png', '')
+            name, _ = os.path.splitext(os.path.basename(path))
             repeatable = 'Repeatable' in path
-            weight = int(re.search(r'\d\d', path).group()) # type: ignore
+            try:
+                weight = int(re.search(r'\d\d', path).group()) # type: ignore
+            except:
+                weight = 5
             if 'Middle' in path:
                 location = TileLocation.MIDDLE
             elif 'Side' in path:
@@ -180,8 +193,13 @@ def tiles_from_folders(folderpath:str) -> List[Tile]:
 
 if __name__ == '__main__':
     tileset = tiles_from_folders('.')
-    grid = make_grid(tileset)
+    grid = make_grid(
+            tileset,
+            lower_blank_percentage=30,
+            upper_blank_percentage=20,
+            special_limit=1,
+            middle_size=3,
+            side_size=3,
+            )
     imagecache = ImageCache()
     img = make_grid_image(grid, imagecache)
-    img.save('test.png')
-
