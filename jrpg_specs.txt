@@ -1,0 +1,59 @@
+-Minimum Viable-
+2 x 9 grid
+
+Top layer has 5 different tile types:
+blank
+ledge, no connection
+ledge, ladder
+ledge, stairs to left
+ledge, stairs to right
+all have equal chance of appearing in any of the 9 slots
+
+Bottom layer is broken out into two types; sides and middle
+
+Middle refers to the center three tiles, sides are the 3 tiles on the left and the 3 tiles on the right.
+
+Side areas have 2 different tile types:
+blank
+normal environment item (like a brazier)
+
+Middle area has 3 different tile types:
+blank
+normal environment item (like a brazier)
+special environment item (like lava pit, or healing font)
+
+There should be a maximum of 1 special environment tile on any map.
+
+
+
+-Full Version-
+
+Adjustable Engagement Range setting:
+Very Short range: 3 left, 1 middle, 3 right (max 1 special middle tile)
+Short Range: 3 left, 3 middle, 3 right (max 1 special middle tile)
+Medium Range: 6 left, 3 middle, 6 right (max 1 special middle tile)
+Long Range: 6 left, 6 middle,  6 right (max 2 special middle tiles)
+Very long Range: 6 left, 9 middle, 6 right (max 3 special middle tiles)
+
+Select 0, 1, or 2 Upper Layers
+
+Should be able to design any number of tiles and assign them as either top, side, or middle.
+
+Should be able to assign frequencies for each tile design without adjusting the coding
+
+Should be able to set what tileset is being used. ie "cave" "dungeon" "castle" "forest"
+
+Certain tiles should not repeat, such as multiple pits next to each other
+
+Designate tiles as either:
+normal repeatable
+normal nonrepeatable
+special (for middle)
+
+
+----
+dpriver Aug 1st 2020
+
+Nonrepeatable can't be next to the same tile.
+
+Configurable blank percentage
