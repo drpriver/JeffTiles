@@ -49,3 +49,11 @@ Designate tiles as either:
 normal repeatable
 normal nonrepeatable
 special (for middle)
+
+
+----
+dpriver Aug 1st 2020
+
+Nonrepeatable can't be next to the same tile.
+
+Configurable blank percentage
