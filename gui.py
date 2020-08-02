@@ -1,8 +1,14 @@
+from appdirs import user_data_dir
 from typing import Callable, List, Optional, Any, Dict, Tuple
 from grid import tiles_from_folders, make_grid, make_grid_image, Tile, Grid, imagecache
+import pickle
 import tkinter as tk
 import tkinter.filedialog
 from PIL import ImageTk, Image
+import os
+import atexit
+DATADIR = user_data_dir(appname='JeffTiles', appauthor='David')
+DATAPATH = os.path.join(DATADIR, 'tiledata.pickle')
 root = tk.Tk()
 root.title("make grid")
 root.geometry('1400x700')
@@ -78,6 +84,8 @@ class App:
         self.im:Optional[Image] = None
         self.grid:Optional[Grid] = None
         self.tiles:List[Tile] = []
+        self.all_tiles : Dict[str, List[Tile]] = {}
+        self.maybe_load_tile_data()
         self.config = GeneratorConfig()
         self.master = master
         self.canvas = tk.Canvas()
@@ -86,6 +94,26 @@ class App:
         self.make_buttons()
         self.make_inputs()
         self.make_tile_configurer()
+        if self.tiles:
+            self.fill_tile_configurer()
+
+    def maybe_load_tile_data(self) -> None:
+        try:
+            with open(DATAPATH, 'rb') as fp:
+                data = pickle.load(fp)
+            self.all_tiles = data
+            if 'Cave' in self.all_tiles:
+                self.tiles = self.all_tiles['Cave']
+        except:
+            return
+
+    def save_tile_data(self) -> None:
+        print(DATAPATH)
+        print(len(self.all_tiles))
+        if not os.path.isdir(DATADIR):
+            os.makedirs(DATADIR)
+        with open(DATAPATH, 'wb') as fp:
+            pickle.dump(self.all_tiles, fp)
 
     def make_tile_configurer(self) -> None:
         self.tile_labels = [
@@ -132,7 +160,7 @@ class App:
         self.tile_list_sb.config(command=self.tile_list_lb.yview)
 
 
-        self.tile_list_canvas = tk.Canvas(frm_tileconf, width=250, height=250,bg='red')
+        self.tile_list_canvas = tk.Canvas(frm_tileconf, width=250, height=250,border=1)
         self.tile_list_canvas.grid(row=0, column=1, sticky='n')
 
         frm_tile_inputs = tk.Frame(frm_tileconf)
@@ -185,6 +213,7 @@ class App:
             self.tiles = tiles_from_folders(imagefolder)
             if self.tiles:
                 self.fill_tile_configurer()
+                self.all_tiles['Cave'] = self.tiles
 
 
 
@@ -252,3 +281,4 @@ class App:
 
 app = App(root)
 root.mainloop()
+atexit.register(app.save_tile_data)
