@@ -47,6 +47,7 @@ class GeneratorConfig:
         self.special_limit = 1
         self.middle_size = 3
         self.side_size = 3
+        self.tile_px = 250
 
     def make_grid(self, tiles:List[Tile]) -> Grid:
         return make_grid(
@@ -57,6 +58,8 @@ class GeneratorConfig:
                 middle_size            = self.middle_size,
                 side_size              = self.side_size,
                 )
+    def make_grid_image(self, grid:Grid) -> Image:
+        return make_grid_image(grid, tiledim = self.tile_px)
 
 def setter(thing:Any, attr:str, type_:Constrained, sv, entry) -> Callable:
     def set_val(*args, **kwargs):
@@ -87,6 +90,7 @@ class App:
         self.all_tiles : Dict[str, List[Tile]] = {}
         self.tileset_names: List[str] = []
         self.config = GeneratorConfig()
+        self.maybe_load_tile_data()
         self.master = master
         self.canvas = tk.Canvas()
         self.canvas.pack(side='bottom', fill='both', expand='yes')
@@ -94,31 +98,29 @@ class App:
         self.make_buttons()
         self.make_inputs()
         self.make_tile_configurer()
-        self.maybe_load_tile_data()
+        if self.tileset_names:
+            for name in self.tileset_names:
+                self.tileset_lb.insert(tk.END, name)
+            self.tiles = self.all_tiles[self.tileset_names[0]]
+            self.tileset_lb.activate(0)
         if self.tiles:
             self.fill_tile_configurer()
 
     def maybe_load_tile_data(self) -> None:
         try:
             with open(DATAPATH, 'rb') as fp:
-                data = pickle.load(fp)
+                data, config = pickle.load(fp)
             self.all_tiles = data
+            self.config = config
             self.tileset_names = sorted(self.all_tiles.keys())
-            if self.tileset_names:
-                for name in self.tileset_names:
-                    self.tileset_lb.insert(tk.END, name)
-                self.tiles = self.all_tiles[self.tileset_names[0]]
-                self.tileset_lb.activate(0)
         except Exception as e:
             return
 
     def save_tile_data(self) -> None:
-        print(DATAPATH)
-        print(len(self.all_tiles))
         if not os.path.isdir(DATADIR):
             os.makedirs(DATADIR)
         with open(DATAPATH, 'wb') as fp:
-            pickle.dump(self.all_tiles, fp)
+            pickle.dump((self.all_tiles, self.config), fp)
 
     def make_tile_configurer(self) -> None:
         self.tile_labels = [
@@ -126,6 +128,9 @@ class App:
             ('Weight', 'weight', Constrained(int, 1, 100),),
             ('Special', 'special', bool,),
             ('Blank', 'is_blank', bool,),
+            ('Side', 'side', bool,),
+            ('Middle', 'middle', bool,),
+            ('Upper', 'upper', bool,),
             ]
         frm_tileconf = tk.Frame()
         frm_tileconf.pack(side='left', padx=10)
@@ -205,8 +210,10 @@ class App:
         self.tileset_delete_button.grid(row=1, column=0, columnspan=2)
 
         self.tile_list_sv = tk.StringVar()
-        frm_listbox = tk.Frame(frm_tileconf)
-        frm_listbox.grid(row=0, column=1, sticky='n')
+        frm_listbox_meta = tk.Frame(frm_tileconf)
+        frm_listbox_meta.grid(row=0, column=1, sticky='n')
+        frm_listbox = tk.Frame(frm_listbox_meta)
+        frm_listbox.pack()
         self.tile_list_lb = tk.Listbox(frm_listbox, listvariable=self.tile_list_sv, selectmode='single', height=14)
         self.tile_list_lb.bind('<ButtonRelease>', lb_callback)
         self.tile_list_lb.pack(side='left',fill='y')
@@ -214,6 +221,10 @@ class App:
         self.tile_list_sb.pack(side='left', fill='y')
         self.tile_list_lb.config(yscrollcommand=self.tile_list_sb.set)
         self.tile_list_sb.config(command=self.tile_list_lb.yview)
+
+        btn_choose = tk.Button(text='Load Tiles', master=frm_listbox_meta, command=self.get_tiles)
+        btn_choose.pack(side=tk.LEFT, padx=10, ipadx=10)
+        self.btn_choose = btn_choose
 
 
         self.tile_list_canvas = tk.Canvas(frm_tileconf, width=250, height=250,border=1)
@@ -239,7 +250,6 @@ class App:
                 checkbox = tk.Checkbutton(master=frm_tile_inputs, variable=bv)
                 checkbox.grid(row=n, column=1, sticky='w')
                 self.tile_input_controls[attrname] = (checkbox, bv)
-
 
     def fill_tile_configurer(self) -> None:
         self.tile_list_canvas.delete("all")
@@ -277,8 +287,6 @@ class App:
                 self.all_tiles[tileset_name] = self.tiles
                 self.fill_tile_configurer()
 
-
-
     def make_inputs(self) -> None:
         self.input_labels: List[tk.Label] = []
         self.input_entries: List[tk.Entry] = []
@@ -291,6 +299,7 @@ class App:
             ('Special Limit', 'special_limit',         Constrained(int, 0, 3)),
             ('Middle Size',   'middle_size',           Constrained(int, 1, 10)),
             ('Side Size',     'side_size',             Constrained(int, 1, 10)),
+            ('Tile Px',       'tile_px',               Constrained(int, 25, 500)),
             ]
         for n, (text, attrname, type_) in enumerate(labels):
             label = tk.Label(master=frm_form, text=text)
@@ -302,7 +311,6 @@ class App:
             label.grid(row=n, column=0, sticky='e')
             entry.grid(row=n, column=1)
 
-
     def make_buttons(self) -> None:
         frm_buttons = tk.Frame()
         frm_buttons.pack(side='top', fill=tk.X, ipadx=5, ipady=5)
@@ -313,15 +321,11 @@ class App:
         btn_save = tk.Button(text='Save Map', master=frm_buttons, command=self.save_grid)
         btn_save.pack(side=tk.LEFT, padx=10, ipadx=10)
         self.btn_save = btn_save
-        btn_choose = tk.Button(text='Load Tiles', master=frm_buttons, command=self.get_tiles)
-        btn_choose.pack(side=tk.LEFT, padx=10, ipadx=10)
-        self.btn_choose = btn_choose
-
 
     def generate_grid(self) -> None:
         if self.tiles:
             self.grid = self.config.make_grid(self.tiles)
-            self.im = make_grid_image(self.grid)
+            self.im = self.config.make_grid_image(self.grid)
             self.display_grid()
 
     def display_grid(self, *args, **kwargs) -> None:
@@ -342,5 +346,5 @@ class App:
         return
 
 app = App(root)
-root.mainloop()
 atexit.register(app.save_tile_data)
+root.mainloop()

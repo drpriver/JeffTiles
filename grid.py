@@ -31,7 +31,9 @@ class Tile:
     path: str
     repeatable: bool
     weight: int
-    location: TileLocation
+    middle: bool
+    side: bool
+    upper: bool
     biome: str
     special: bool
     is_blank: bool
@@ -54,7 +56,7 @@ def make_grid(
     grid = Grid(WIDTH, HEIGHT)
     upper_blanks:List[Tile] = []
     upper_nonblanks:List[Tile] = []
-    for t in (t for t in tileset if t.location & TileLocation.UPPER):
+    for t in (t for t in tileset if t.upper):
         if t.is_blank:
             upper_blanks.append(t)
         else:
@@ -68,7 +70,7 @@ def make_grid(
 
     side_blanks:List[Tile] = []
     side_nonblanks:List[Tile] = []
-    for t in (t for t in tileset if t.location & TileLocation.SIDE):
+    for t in (t for t in tileset if t.side):
         if t.is_blank:
             side_blanks.append(t)
         else:
@@ -76,7 +78,7 @@ def make_grid(
 
     middle_blanks:List[Tile] = []
     middle_nonblanks:List[Tile] = []
-    for t in (t for t in tileset if t.location & TileLocation.MIDDLE):
+    for t in (t for t in tileset if t.middle):
         if t.is_blank:
             middle_blanks.append(t)
         else:
@@ -132,9 +134,9 @@ class ImageCache:
         return img
 
 imagecache = ImageCache()
-def make_grid_image(grid:Grid, imagecache:ImageCache=imagecache) -> Image.Image:
-    TILEWIDTH  = 250
-    TILEHEIGHT = 250
+def make_grid_image(grid:Grid, imagecache:ImageCache=imagecache, tiledim:int=250) -> Image.Image:
+    TILEWIDTH  = tiledim
+    TILEHEIGHT = tiledim
     PIXELWIDTH = grid.width * TILEWIDTH
     PIXELHEIGHT = grid.height * TILEHEIGHT
     img = Image.new('RGB', (PIXELWIDTH, PIXELHEIGHT))
@@ -177,16 +179,24 @@ def tiles_from_folders(folderpath:str) -> List[Tile]:
                 weight = int(re.search(r'\d\d', path).group()) # type: ignore
             except:
                 weight = 5
-            if 'Middle' in path:
-                location = TileLocation.MIDDLE
-            elif 'Side' in path:
-                location = TileLocation.SIDE 
-            else:
-                location = TileLocation.UPPER
+            middle = 'Middle' in path
+            side = 'Side' in path
+            upper = 'Upper' in path
             biome = 'Cave'
             special = 'Special' in path
             is_blank = 'Blank' in path
-            tileset.append(Tile(name, os.path.abspath(path), repeatable, weight, location, biome, special, is_blank))
+            tileset.append(Tile(
+                name=name,
+                path=os.path.abspath(path),
+                repeatable=repeatable,
+                weight=weight,
+                middle=middle,
+                side=side,
+                upper=upper,
+                biome=biome,
+                special=special,
+                is_blank=is_blank
+                ))
         except:
             continue
     return tileset
