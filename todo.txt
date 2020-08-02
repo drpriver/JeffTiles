@@ -1,5 +1,4 @@
 Handle missing images (especially on re-opening the program)
-Delete individual tiles from a tileset
 Don't clear out a tileset when loading, instead deduplicate
 Add a version to the pickled data so as to support changing the data model
 When creating a new tileset, the new tileset should become active
