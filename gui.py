@@ -50,7 +50,7 @@ class GeneratorConfig:
 
     def make_grid(self, tiles:List[Tile]) -> Grid:
         return make_grid(
-                tiles, 
+                tiles,
                 lower_blank_percentage = self.lower_blank_percentage,
                 upper_blank_percentage = self.upper_blank_percentage,
                 special_limit          = self.special_limit,
@@ -85,7 +85,7 @@ class App:
         self.grid:Optional[Grid] = None
         self.tiles:List[Tile] = []
         self.all_tiles : Dict[str, List[Tile]] = {}
-        self.maybe_load_tile_data()
+        self.tileset_names: List[str] = []
         self.config = GeneratorConfig()
         self.master = master
         self.canvas = tk.Canvas()
@@ -94,6 +94,7 @@ class App:
         self.make_buttons()
         self.make_inputs()
         self.make_tile_configurer()
+        self.maybe_load_tile_data()
         if self.tiles:
             self.fill_tile_configurer()
 
@@ -102,9 +103,13 @@ class App:
             with open(DATAPATH, 'rb') as fp:
                 data = pickle.load(fp)
             self.all_tiles = data
-            if 'Cave' in self.all_tiles:
-                self.tiles = self.all_tiles['Cave']
-        except:
+            self.tileset_names = sorted(self.all_tiles.keys())
+            if self.tileset_names:
+                for name in self.tileset_names:
+                    self.tileset_lb.insert(tk.END, name)
+                self.tiles = self.all_tiles[self.tileset_names[0]]
+                self.tileset_lb.activate(0)
+        except Exception as e:
             return
 
     def save_tile_data(self) -> None:
@@ -125,7 +130,6 @@ class App:
         frm_tileconf = tk.Frame()
         frm_tileconf.pack(side='left', padx=10)
         self.preview_tile = None
-        self.tile_list_sv = tk.StringVar()
         def lb_callback(*args, **kwargs):
             lb_sel = self.tile_list_lb.curselection()
             if not lb_sel:
@@ -148,9 +152,61 @@ class App:
                     bv.set(getattr(tile, attrname))
                     self.tile_input_controls_cbname[attrname] = bv.trace_add("write", boolsetter(tile, attrname, bv))
 
+        def tileset_lb_callback(*args, **kwargs):
+            lb_sel = self.tileset_lb.curselection()
+            if not lb_sel:
+                return
+            tileset_name = self.tileset_lb.get(*lb_sel)
+            self.tiles = self.all_tiles[tileset_name]
+            self.fill_tile_configurer()
 
+        self.tileset_sv = tk.StringVar()
+        frm_tileset_lb_meta = tk.Frame(frm_tileconf)
+        frm_tileset_lb_meta.grid(row=0, column=0, sticky='n')
+        frm_tileset_lb = tk.Frame(frm_tileset_lb_meta)
+        frm_tileset_lb.grid(row=0, column=0, sticky='n')
+        self.tileset_lb = tk.Listbox(frm_tileset_lb, listvariable=self.tileset_sv, selectmode='single', height=12)
+        self.tileset_lb.bind('<ButtonRelease>', tileset_lb_callback)
+        self.tileset_lb.pack(side='left',fill='y')
+        self.tileset_sb = tk.Scrollbar(frm_tileset_lb)
+        self.tileset_sb.pack(side='left', fill='y')
+        self.tileset_lb.config(yscrollcommand=self.tileset_sb.set)
+        self.tileset_sb.config(command=self.tileset_lb.yview)
+        def tileset_deleter(*args, **kwargs):
+            lb_sel = self.tileset_lb.curselection()
+            if not lb_sel:
+                return
+            tileset_name = self.tileset_lb.get(*lb_sel)
+            self.tileset_names.remove(tileset_name)
+            del self.all_tiles[tileset_name]
+            self.tileset_lb.delete(lb_sel[0])
+            self.tiles = []
+            self.fill_tile_configurer()
+        frm_tileset_buttons = tk.Frame(frm_tileset_lb_meta)
+        frm_tileset_buttons.grid(row=1, column=0, sticky='n')
+        self.tileset_add_entry = tk.Entry(frm_tileset_buttons, width=10)
+        self.tileset_add_entry.grid(row=0, column=0)
+        def add_tileset(*args, **kwargs):
+            name = self.tileset_add_entry.get().strip()
+            if not name:
+                return
+            self.tileset_add_entry.delete(0, tk.END)
+            if name in self.all_tiles:
+                return
+            self.tileset_names.append(name)
+            self.tileset_lb.insert(tk.END, name)
+            self.all_tiles[name] = []
+            self.tiles = []
+            self.fill_tile_configurer()
+        self.tileset_add_button = tk.Button(frm_tileset_buttons, text='New Tileset', command=add_tileset)
+        self.tileset_add_button.grid(row=0, column=1)
+
+        self.tileset_delete_button = tk.Button(frm_tileset_buttons, text='Delete Tileset', command=tileset_deleter)
+        self.tileset_delete_button.grid(row=1, column=0, columnspan=2)
+
+        self.tile_list_sv = tk.StringVar()
         frm_listbox = tk.Frame(frm_tileconf)
-        frm_listbox.grid(row=0, column=0, sticky='n')
+        frm_listbox.grid(row=0, column=1, sticky='n')
         self.tile_list_lb = tk.Listbox(frm_listbox, listvariable=self.tile_list_sv, selectmode='single', height=14)
         self.tile_list_lb.bind('<ButtonRelease>', lb_callback)
         self.tile_list_lb.pack(side='left',fill='y')
@@ -161,13 +217,13 @@ class App:
 
 
         self.tile_list_canvas = tk.Canvas(frm_tileconf, width=250, height=250,border=1)
-        self.tile_list_canvas.grid(row=0, column=1, sticky='n')
+        self.tile_list_canvas.grid(row=0, column=2, sticky='n')
 
         frm_tile_inputs = tk.Frame(frm_tileconf)
-        frm_tile_inputs.grid(row=0, column=2, sticky='n')
+        frm_tile_inputs.grid(row=0, column=3, sticky='n')
         self.tile_input_controls:Dict[str, Tuple] = {}
         self.tile_input_controls_cbname: Dict[str, Any] = {}
-        
+
         for n, (text, attrname, typ) in enumerate(self.tile_labels):
             label = tk.Label(master=frm_tile_inputs, text=text)
             self.input_labels.append(label)
@@ -186,6 +242,8 @@ class App:
 
 
     def fill_tile_configurer(self) -> None:
+        self.tile_list_canvas.delete("all")
+        self.tile_list_lb.delete("0", tk.END)
         for (text, attrname, typ) in self.tile_labels:
             if isinstance(typ, Constrained):
                 entry, sv = self.tile_input_controls[attrname]
@@ -201,19 +259,23 @@ class App:
                 bv.set(False)
 
         for n, t in enumerate(self.tiles):
-            self.tile_list_lb.insert(n, t.name)
+            self.tile_list_lb.insert(n+1, t.name)
 
     def get_tiles(self, *args, **kwargs) -> None:
+        lb_sel = self.tileset_lb.curselection()
+        if not lb_sel:
+            return
+        tileset_name = self.tileset_lb.get(*lb_sel)
+
         imagefolder = tkinter.filedialog.askdirectory(
                 title = 'Where are the images',
                 mustexist=True,
                 )
         if imagefolder:
-            self.tile_list_lb.delete("1", tk.END)
             self.tiles = tiles_from_folders(imagefolder)
             if self.tiles:
+                self.all_tiles[tileset_name] = self.tiles
                 self.fill_tile_configurer()
-                self.all_tiles['Cave'] = self.tiles
 
 
 
