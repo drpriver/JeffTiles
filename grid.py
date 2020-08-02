@@ -1,7 +1,6 @@
 import enum
 from typing import List, NamedTuple, Optional, Tuple
 from PIL import Image
-import numpy as np
 import random
 import glob
 import os
