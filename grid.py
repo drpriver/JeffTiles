@@ -5,6 +5,7 @@ from PIL import Image
 import random
 import glob
 import os
+import re
 
 class Grid:
     def __init__(self, width:int, height:int):
@@ -148,7 +149,34 @@ def make_grid_image(grid:Grid, imagecache:ImageCache=imagecache, tiledim:int=250
         img.paste(subimg.resize((TILEWIDTH, TILEHEIGHT)), (TILEWIDTH*n, TILEHEIGHT))
     return img
 
-import re
+
+
+def load_tile(path:str) -> Tile:
+    name, _ = os.path.splitext(os.path.basename(path))
+    repeatable = 'Repeatable' in path
+    try:
+        weight = int(re.search(r'\d\d', path).group()) # type: ignore
+    except:
+        weight = 5
+    middle = 'Middle' in path
+    side = 'Side' in path
+    upper = 'Upper' in path
+    biome = 'Cave'
+    special = 'Special' in path
+    is_blank = 'Blank' in path
+    return Tile(
+        name=name,
+        path=os.path.abspath(path),
+        repeatable=repeatable,
+        weight=weight,
+        middle=middle,
+        side=side,
+        upper=upper,
+        biome=biome,
+        special=special,
+        is_blank=is_blank
+        )
+
 
 def tiles_from_folders(folderpath:str) -> List[Tile]:
     extensions = [
@@ -173,30 +201,7 @@ def tiles_from_folders(folderpath:str) -> List[Tile]:
     tileset : List[Tile] = []
     for path in paths:
         try:
-            name, _ = os.path.splitext(os.path.basename(path))
-            repeatable = 'Repeatable' in path
-            try:
-                weight = int(re.search(r'\d\d', path).group()) # type: ignore
-            except:
-                weight = 5
-            middle = 'Middle' in path
-            side = 'Side' in path
-            upper = 'Upper' in path
-            biome = 'Cave'
-            special = 'Special' in path
-            is_blank = 'Blank' in path
-            tileset.append(Tile(
-                name=name,
-                path=os.path.abspath(path),
-                repeatable=repeatable,
-                weight=weight,
-                middle=middle,
-                side=side,
-                upper=upper,
-                biome=biome,
-                special=special,
-                is_blank=is_blank
-                ))
+            tileset.append(load_tile(path))
         except:
             continue
     return tileset

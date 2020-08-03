@@ -1,6 +1,6 @@
 from appdirs import user_data_dir
 from typing import Callable, List, Optional, Any, Dict, Tuple
-from grid import tiles_from_folders, make_grid, make_grid_image, Tile, Grid, imagecache
+from grid import tiles_from_folders, make_grid, make_grid_image, Tile, Grid, imagecache, load_tile
 import pickle
 import tkinter as tk
 import tkinter.filedialog
@@ -223,8 +223,25 @@ class App:
         self.tile_list_sb.config(command=self.tile_list_lb.yview)
 
         btn_choose = tk.Button(text='Load Tiles', master=frm_listbox_meta, command=self.get_tiles)
-        btn_choose.pack(side=tk.LEFT, padx=10, ipadx=10)
+        btn_choose.pack(side=tk.TOP, padx=10, ipadx=10)
         self.btn_choose = btn_choose
+
+        btn_add_tile = tk.Button(text='Add Tile', master=frm_listbox_meta, command=self.add_tile)
+        btn_add_tile.pack(side=tk.TOP, padx=10, ipadx=10)
+        self.btn_add_tile = btn_add_tile
+
+        def delete_tile(*args, **kwargs) -> None:
+            sel = self.tile_list_lb.curselection()
+            if not sel:
+                return
+            index = sel[0]
+            assert isinstance(index, int)
+            self.tiles.pop(index)
+            self.fill_tile_configurer()
+
+        btn_delete_tile = tk.Button(text='Delete Tile', master=frm_listbox_meta, command=delete_tile)
+        btn_delete_tile.pack(side=tk.LEFT, padx=10, ipadx=10)
+        self.btn_delete_tile = btn_delete_tile
 
 
         self.tile_list_canvas = tk.Canvas(frm_tileconf, width=250, height=250,border=1)
@@ -271,6 +288,16 @@ class App:
         for n, t in enumerate(self.tiles):
             self.tile_list_lb.insert(n+1, t.name)
 
+    def add_tile(self) -> None:
+        imagefile = tkinter.filedialog.askopenfilename(
+            title='Choose an image',
+            )
+        if not os.path.isfile(imagefile):
+            return
+        tile = load_tile(imagefile)
+        self.tiles.append(tile)
+        self.fill_tile_configurer()
+
     def get_tiles(self, *args, **kwargs) -> None:
         lb_sel = self.tileset_lb.curselection()
         if not lb_sel:
@@ -281,6 +308,8 @@ class App:
                 title = 'Where are the images',
                 mustexist=True,
                 )
+        if not os.path.isdir(imagefolder):
+            return
         if imagefolder:
             self.tiles = tiles_from_folders(imagefolder)
             if self.tiles:
@@ -342,6 +371,8 @@ class App:
                     title='Where to save',
                     defaultextension='.png',
                     )
+            if not savepath:
+                return
             self.im.save(savepath)
         return
 
