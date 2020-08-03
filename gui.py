@@ -4,6 +4,7 @@ from grid import tiles_from_folders, make_grid, make_grid_image, Tile, Grid, ima
 import pickle
 import tkinter as tk
 import tkinter.filedialog
+import tkinter.messagebox
 from PIL import ImageTk, Image
 import os
 import atexit
@@ -120,9 +121,12 @@ class App:
             for name in self.tileset_names:
                 self.tileset_lb.insert(tk.END, name)
             self.tiles = self.all_tiles[self.tileset_names[0]]
-            self.tileset_lb.activate(0)
+            self.tileset_lb.select_set(0)
+            self.tileset_lb.event_generate("<<ListboxSelect>>")
         if self.tiles:
             self.fill_tile_configurer()
+            self.tile_list_lb.select_set(0)
+            self.tile_list_lb.event_generate("<<ListboxSelect>>")
 
     def maybe_load_tile_data(self) -> None:
         try:
@@ -190,7 +194,7 @@ class App:
         frm_tileset_lb = tk.Frame(frm_tileset_lb_meta)
         frm_tileset_lb.grid(row=0, column=0, sticky='n')
         self.tileset_lb = tk.Listbox(frm_tileset_lb, listvariable=self.tileset_sv, selectmode='single', height=12)
-        self.tileset_lb.bind('<ButtonRelease>', tileset_lb_callback)
+        self.tileset_lb.bind('<<ListboxSelect>>', tileset_lb_callback)
         self.tileset_lb.pack(side='left',fill='y')
         self.tileset_sb = tk.Scrollbar(frm_tileset_lb)
         self.tileset_sb.pack(side='left', fill='y')
@@ -222,6 +226,9 @@ class App:
             self.all_tiles[name] = []
             self.tiles = []
             self.fill_tile_configurer()
+            self.tileset_lb.select_set(tk.END)
+            self.tileset_lb.event_generate("<<ListboxSelect>>")
+
         self.tileset_add_button = tk.Button(frm_tileset_buttons, text='New Tileset', command=add_tileset)
         self.tileset_add_button.grid(row=0, column=1)
 
@@ -234,7 +241,7 @@ class App:
         frm_listbox = tk.Frame(frm_listbox_meta)
         frm_listbox.grid(row=0, column=0, sticky='ew')
         self.tile_list_lb = tk.Listbox(frm_listbox, listvariable=self.tile_list_sv, selectmode='single', height=14)
-        self.tile_list_lb.bind('<ButtonRelease>', lb_callback)
+        self.tile_list_lb.bind('<<ListboxSelect>>', lb_callback)
         self.tile_list_lb.pack(side='left',fill='y')
         self.tile_list_sb = tk.Scrollbar(frm_listbox)
         self.tile_list_sb.pack(side='left', fill='y')
@@ -252,16 +259,7 @@ class App:
         btn_add_tile.grid(row=1, column=0, sticky='ew')
         self.btn_add_tile = btn_add_tile
 
-        def delete_tile(*args, **kwargs) -> None:
-            sel = self.tile_list_lb.curselection()
-            if not sel:
-                return
-            index = sel[0]
-            assert isinstance(index, int)
-            self.tiles.pop(index)
-            self.fill_tile_configurer()
-
-        btn_delete_tile = tk.Button(text='Delete Tile', master=frm_listbox_buttons, command=delete_tile)
+        btn_delete_tile = tk.Button(text='Delete Tile', master=frm_listbox_buttons, command=self.del_tile)
         btn_delete_tile.grid(row=2, column=0, sticky='ew')
         self.btn_delete_tile = btn_delete_tile
 
@@ -310,15 +308,42 @@ class App:
         for n, t in enumerate(self.tiles):
             self.tile_list_lb.insert(n+1, t.name)
 
+
+    def del_tile(self) -> None:
+        sel = self.tile_list_lb.curselection()
+        if not sel:
+            return
+        index = sel[0]
+        assert isinstance(index, int)
+        self.tiles.pop(index)
+        self.fill_tile_configurer()
+        if index < len(self.tiles):
+            self.tile_list_lb.select_set(index)
+            self.tile_list_lb.event_generate("<<ListboxSelect>>")
+            self.tile_list_lb.see(index)
+        else:
+            if self.tiles:
+                self.tile_list_lb.select_set(index-1)
+                self.tile_list_lb.event_generate("<<ListboxSelect>>")
+                self.tile_list_lb.see(index-1)
+
+
     def add_tile(self) -> None:
         imagefile = tkinter.filedialog.askopenfilename(
             title='Choose an image',
             )
         if not os.path.isfile(imagefile):
             return
-        tile = load_tile(imagefile)
+        try:
+            tile = load_tile(imagefile)
+        except Exception as e:
+            tkinter.messagebox.showerror(title='Unable to add tile', message='Unable to add tile: {}'.format(e))
+            return
         self.tiles.append(tile)
         self.fill_tile_configurer()
+        self.tile_list_lb.select_set(len(self.tiles)-1)
+        self.tile_list_lb.event_generate("<<ListboxSelect>>")
+        self.tile_list_lb.see(len(self.tiles)-1)
 
     def get_tiles(self, *args, **kwargs) -> None:
         lb_sel = self.tileset_lb.curselection()
@@ -333,7 +358,11 @@ class App:
         if not os.path.isdir(imagefolder):
             return
         if imagefolder:
-            self.tiles = tiles_from_folders(imagefolder)
+            tiles = tiles_from_folders(imagefolder)
+            if tiles:
+                self.tiles = tiles
+            else:
+                return
             if self.tiles:
                 self.all_tiles[tileset_name] = self.tiles
                 self.fill_tile_configurer()

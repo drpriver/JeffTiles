@@ -1,6 +1,4 @@
 Handle missing images (especially on re-opening the program)
 Don't clear out a tileset when loading, instead deduplicate
 Add a version to the pickled data so as to support changing the data model
-When creating a new tileset, the new tileset should become active
 Impossible actions should be grayed out
-Error Messages (invalid data)

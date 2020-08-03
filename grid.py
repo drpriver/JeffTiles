@@ -154,8 +154,9 @@ def make_grid_image(grid:Grid, imagecache:ImageCache=imagecache, tiledim:int=250
 
 
 
-def load_tile(path:str) -> Tile:
+def load_tile(path:str, imagecache:ImageCache=imagecache) -> Tile:
     name, _ = os.path.splitext(os.path.basename(path))
+    _ = imagecache.get(path)
     repeatable = 'Repeatable' in path
     try:
         weight = int(re.search(r'\d\d', path).group()) # type: ignore
