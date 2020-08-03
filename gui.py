@@ -41,13 +41,30 @@ class Constrained:
 
 
 class GeneratorConfig:
+    defaults = [
+        ('lower_blank_percentage', 30),
+        ('upper_blank_percentage', 30),
+        ('special_limit',           1),
+        ('middle_size',             3),
+        ('side_size',               3),
+        ('tile_px',               250),
+        ('height',                  2),
+        ]
+    lower_blank_percentage:float
+    upper_blank_percentage:float
+    special_limit:int
+    middle_size:int
+    side_size:int
+    tile_px:int
+    height:int
     def __init__(self):
-        self.lower_blank_percentage = 30
-        self.upper_blank_percentage = 30
-        self.special_limit = 1
-        self.middle_size = 3
-        self.side_size = 3
-        self.tile_px = 250
+        for attrname, val in self.defaults:
+            setattr(self, attrname, val)
+    # this is for backwards compat
+    def reinit(self):
+        for attrname, val in self.defaults:
+            if not hasattr(self, attrname):
+                setattr(self, attrname, val)
 
     def make_grid(self, tiles:List[Tile]) -> Grid:
         return make_grid(
@@ -57,6 +74,7 @@ class GeneratorConfig:
                 special_limit          = self.special_limit,
                 middle_size            = self.middle_size,
                 side_size              = self.side_size,
+                height                 = self.height,
                 )
     def make_grid_image(self, grid:Grid) -> Image:
         return make_grid_image(grid, tiledim = self.tile_px)
@@ -112,6 +130,7 @@ class App:
                 data, config = pickle.load(fp)
             self.all_tiles = data
             self.config = config
+            self.config.reinit()
             self.tileset_names = sorted(self.all_tiles.keys())
         except Exception as e:
             return
@@ -207,13 +226,13 @@ class App:
         self.tileset_add_button.grid(row=0, column=1)
 
         self.tileset_delete_button = tk.Button(frm_tileset_buttons, text='Delete Tileset', command=tileset_deleter)
-        self.tileset_delete_button.grid(row=1, column=0, columnspan=2)
+        self.tileset_delete_button.grid(row=1, column=0, columnspan=2, sticky='ew')
 
         self.tile_list_sv = tk.StringVar()
         frm_listbox_meta = tk.Frame(frm_tileconf)
         frm_listbox_meta.grid(row=0, column=1, sticky='n')
         frm_listbox = tk.Frame(frm_listbox_meta)
-        frm_listbox.pack()
+        frm_listbox.grid(row=0, column=0, sticky='ew')
         self.tile_list_lb = tk.Listbox(frm_listbox, listvariable=self.tile_list_sv, selectmode='single', height=14)
         self.tile_list_lb.bind('<ButtonRelease>', lb_callback)
         self.tile_list_lb.pack(side='left',fill='y')
@@ -222,12 +241,15 @@ class App:
         self.tile_list_lb.config(yscrollcommand=self.tile_list_sb.set)
         self.tile_list_sb.config(command=self.tile_list_lb.yview)
 
-        btn_choose = tk.Button(text='Load Tiles', master=frm_listbox_meta, command=self.get_tiles)
-        btn_choose.pack(side=tk.TOP, padx=10, ipadx=10)
+        frm_listbox_buttons = tk.Frame(frm_listbox_meta)
+        frm_listbox_buttons.grid(row=1, column=0, sticky='ew')
+
+        btn_choose = tk.Button(text='Load Tiles', master=frm_listbox_buttons, command=self.get_tiles)
+        btn_choose.grid(row=0, column=0, sticky='ew')
         self.btn_choose = btn_choose
 
-        btn_add_tile = tk.Button(text='Add Tile', master=frm_listbox_meta, command=self.add_tile)
-        btn_add_tile.pack(side=tk.TOP, padx=10, ipadx=10)
+        btn_add_tile = tk.Button(text='Add Tile', master=frm_listbox_buttons, command=self.add_tile)
+        btn_add_tile.grid(row=1, column=0, sticky='ew')
         self.btn_add_tile = btn_add_tile
 
         def delete_tile(*args, **kwargs) -> None:
@@ -239,8 +261,8 @@ class App:
             self.tiles.pop(index)
             self.fill_tile_configurer()
 
-        btn_delete_tile = tk.Button(text='Delete Tile', master=frm_listbox_meta, command=delete_tile)
-        btn_delete_tile.pack(side=tk.LEFT, padx=10, ipadx=10)
+        btn_delete_tile = tk.Button(text='Delete Tile', master=frm_listbox_buttons, command=delete_tile)
+        btn_delete_tile.grid(row=2, column=0, sticky='ew')
         self.btn_delete_tile = btn_delete_tile
 
 
@@ -323,12 +345,13 @@ class App:
         frm_form = tk.Frame(relief=tk.SUNKEN, borderwidth=3)
         frm_form.pack(side='left', padx=10, anchor='nw')
         labels = [
-            ('Lower Blank%', 'lower_blank_percentage', Constrained(float, 0, 100)),
-            ('Upper Blank%', 'upper_blank_percentage', Constrained(float, 0, 100)),
-            ('Special Limit', 'special_limit',         Constrained(int, 0, 3)),
-            ('Middle Size',   'middle_size',           Constrained(int, 1, 10)),
-            ('Side Size',     'side_size',             Constrained(int, 1, 10)),
-            ('Tile Px',       'tile_px',               Constrained(int, 25, 500)),
+            ('Lower Blank%',  'lower_blank_percentage', Constrained(float, 0, 100)),
+            ('Upper Blank%',  'upper_blank_percentage', Constrained(float, 0, 100)),
+            ('Special Limit', 'special_limit',          Constrained(int, 0, 3)),
+            ('Middle Size',   'middle_size',            Constrained(int, 1, 10)),
+            ('Side Size',     'side_size',              Constrained(int, 1, 10)),
+            ('Tile Px',       'tile_px',                Constrained(int, 25, 500)),
+            ('Height',        'height',                 Constrained(int, 1, 4)),
             ]
         for n, (text, attrname, type_) in enumerate(labels):
             label = tk.Label(master=frm_form, text=text)

@@ -9,7 +9,7 @@ import re
 
 class Grid:
     def __init__(self, width:int, height:int):
-        self.upper:        List['Tile'] = []
+        self.upper:        List[List['Tile']] = [ [] for _ in range(height-1)]
         self.bottom_left:  List['Tile'] = []
         self.bottom_right: List['Tile'] = []
         self.middle:       List['Tile'] = []
@@ -17,7 +17,7 @@ class Grid:
         self.height = height
 
     def shuffle(self):
-        for l in (self.upper, self.bottom_left, self.bottom_right, self.middle):
+        for l in [self.bottom_left, self.bottom_right, self.middle] + self.upper:
             random.shuffle(l)
 
 @enum.unique
@@ -50,11 +50,10 @@ def make_grid(
         special_limit:int,
         middle_size:int,
         side_size:int,
+        height:int,
         ) -> Grid:
-    UPPER_AMOUNT = side_size * 2 + middle_size
-    WIDTH = UPPER_AMOUNT
-    HEIGHT = 2
-    grid = Grid(WIDTH, HEIGHT)
+    width = side_size * 2 + middle_size
+    grid = Grid(width, height)
     upper_blanks:List[Tile] = []
     upper_nonblanks:List[Tile] = []
     for t in (t for t in tileset if t.upper):
@@ -63,11 +62,13 @@ def make_grid(
         else:
             upper_nonblanks.append(t)
 
-    for _ in range(UPPER_AMOUNT):
-        if random.random() * 100 < upper_blank_percentage:
-            grid.upper.append(select(upper_blanks))
-        else:
-            grid.upper.append(select(upper_nonblanks))
+    for i in range(height-1):
+        upper = grid.upper[i]
+        for _ in range(width):
+            if random.random() * 100 < upper_blank_percentage:
+                upper.append(select(upper_blanks))
+            else:
+                upper.append(select(upper_nonblanks))
 
     side_blanks:List[Tile] = []
     side_nonblanks:List[Tile] = []
@@ -141,12 +142,14 @@ def make_grid_image(grid:Grid, imagecache:ImageCache=imagecache, tiledim:int=250
     PIXELWIDTH = grid.width * TILEWIDTH
     PIXELHEIGHT = grid.height * TILEHEIGHT
     img = Image.new('RGB', (PIXELWIDTH, PIXELHEIGHT))
-    for n, t in enumerate(grid.upper):
-        subimg = imagecache.get(t.path)
-        img.paste(subimg.resize((TILEWIDTH, TILEHEIGHT)), (TILEWIDTH*n, 0))
+    for i in range(grid.height-1):
+        upper = grid.upper[i]
+        for n, t in enumerate(upper):
+            subimg = imagecache.get(t.path)
+            img.paste(subimg.resize((TILEWIDTH, TILEHEIGHT)), (TILEWIDTH*n, TILEHEIGHT*i))
     for n, t in enumerate(grid.bottom_left + grid.middle + grid.bottom_right):
         subimg = imagecache.get(t.path)
-        img.paste(subimg.resize((TILEWIDTH, TILEHEIGHT)), (TILEWIDTH*n, TILEHEIGHT))
+        img.paste(subimg.resize((TILEWIDTH, TILEHEIGHT)), (TILEWIDTH*n, (grid.height-1)*TILEHEIGHT))
     return img
 
 
@@ -215,6 +218,7 @@ if __name__ == '__main__':
             special_limit=1,
             middle_size=3,
             side_size=3,
+            height=2,
             )
     imagecache = ImageCache()
     img = make_grid_image(grid, imagecache)
